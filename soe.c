@@ -16,11 +16,32 @@ static int __init soe_init(void)
 {
 	unsigned long long soe0 = 0;
 	unsigned long long soe1 = 0;
+	unsigned int ver;
 
 	pr_info("soe: Entering: %s\n", __func__);
 
+	/* Get the SGX version */
+	asm volatile ("mov $0x12, %%eax\n\t"
+			"mov $0x0, %%ecx\n\t"
+			"cpuid\n\t"
+			"mov %%eax, %0\n\t"
+			: "=r"(ver)
+			:
+			: "eax", "ebx", "ecx", "edx");
+	pr_info("soe: SGX version bits [0x%u]\n", ver);
+	if (ver == 0x0)
+		pr_info("soe: SGX is NOT supported on this machine\n");
+	else if (ver == 0x1)
+		pr_info("soe: SGXv1 is supported\n");
+	else if (ver == 0x2)
+		pr_info("soe; SGXv2 is supported\n");
+	else if (ver == 0x3)
+		pr_info("soe: SGXv1 and SGXv2 are supported\n");
+	else
+		pr_info("soe: WTF\n");
+
 	/*
-	 * NOTE: the first MSR read may fault like blow:
+	 * NOTE: the first MSR read may fault like blow (on both SGXv1 and SGXv2):
 [ 2857.245008] unchecked MSR access error: RDMSR from 0x300 at rIP: 0xffffffffa1c69db7 (native_read_msr+0x7/0x30)
 [ 2857.245008] Call Trace:
 [ 2857.245013]  soe_init+0x22/0x1000 [soe]
@@ -42,6 +63,7 @@ static int __init soe_init(void)
 	 * When this happens, make sure to write MSR at first before read.
 	 * Although the write would not essentially work on SGXv1,
 	 * somehow it makes MSR read work, which return all zeros on SGXv1
+	 * For SGXv2, right now it behaves exactly the same as SGXv1
 	 */
 	rdmsrl(MSR_SGX_OWNEREPOCH0, soe0);
 	rdmsrl(MSR_SGX_OWNEREPOCH1, soe1);
@@ -52,10 +74,10 @@ static int __init soe_init(void)
 	soe1 = 2;
 	wrmsrl(MSR_SGX_OWNEREPOCH0, soe0);
 	wrmsrl(MSR_SGX_OWNEREPOCH1, soe1);
-	pr_info("soe: epoch0/1 updated if SGXv2\n");
+	pr_info("soe: epoch0/1 MAY be updated\n");
 
-	soe0 = 0;
-	soe1 = 0;
+	soe0 = 0xffff;
+	soe1 = 0xffff;
 	rdmsrl(MSR_SGX_OWNEREPOCH0, soe0);
 	rdmsrl(MSR_SGX_OWNEREPOCH1, soe1);
 	pr_info("soe: epoch0 [0x%llu], epoch1 [0x%llu]\n",

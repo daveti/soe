@@ -82,7 +82,7 @@ static int __init soe_init(void)
 	rdmsrl(MSR_SGX_OWNEREPOCH1, soe1);
 	pr_info("soe: epoch0 [0x%llu], epoch1 [0x%llu]\n",
 		soe0, soe1);
-#
+
 	return 0;
 }
 
